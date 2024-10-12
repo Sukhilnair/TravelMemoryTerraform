@@ -9,6 +9,7 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+  profile = "profile1"
 }
 
 resource "aws_vpc" "travelmemory" {
@@ -134,6 +135,29 @@ resource "aws_security_group" "frontend" {
   }
 }
 
+resource "aws_security_group" "database" {
+  vpc_id = aws_vpc.travelmemory.id
+
+  ingress {
+    description = "Allow frontend port"
+    from_port   = 27017
+    to_port     = 27017
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "database-SG"
+  }
+}
+
 resource "tls_private_key" "my_tls_key" {
   algorithm = "RSA"
   rsa_bits  = 2048
@@ -145,19 +169,12 @@ resource "aws_key_pair" "travelmemory-keypair" {
 }
 
 
-resource "aws_s3_bucket" "mys3bucket" {
-  bucket = var.bucketname
-  tags = {
-    Name        = "travelmemorysukhil07092024"
-    Environment = "Dev"
-  }
-}
-
-resource "aws_instance" "travelmemoryec2" {
-  ami           = "ami-056a29f2eddc40520"
-  instance_type = "t2.micro"
+resource "aws_instance" "travelmemoryfrontend" {
+  ami           = var.ami
+  instance_type = var.instance_type
   subnet_id     = aws_subnet.public.id
   key_name      = aws_key_pair.travelmemory-keypair.key_name
+  user_data     = file("./install_mongodb.sh")
 
   vpc_security_group_ids = [
     aws_security_group.ssh.id,
@@ -165,10 +182,43 @@ resource "aws_instance" "travelmemoryec2" {
     aws_security_group.frontend.id
   ]
 
-  user_data = file("./userdata.sh")
-
   tags = {
-    Name = "travelMemory-sukhil"
+    Name = "travelMemory-application-sukhil"
+  }
+
+}
+
+resource "null_resource" "wait_for_travelmemoryfrontend" {
+  provisioner "local-exec" {
+    command = "aws ec2 wait instance-status-ok --instance-ids ${aws_instance.travelmemoryfrontend.id}  --profile profile1 --region ${var.aws_region}"
+  }
+
+  depends_on = [aws_instance.travelmemoryfrontend]
+}
+
+resource "aws_ami_from_instance" "frontend_ami" {
+  name               = "frontend-ami-${formatdate("YYYYMMDD-HHmmss", timestamp())}"
+  source_instance_id = aws_instance.travelmemoryfrontend.id
+  depends_on         = [null_resource.wait_for_travelmemoryfrontend]
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
+resource "aws_instance" "travelmemorydatabase" {
+  ami           = aws_ami_from_instance.frontend_ami.id
+  instance_type = var.instance_type
+  subnet_id     = aws_subnet.private.id
+  key_name      = aws_key_pair.travelmemory-keypair.key_name
+
+  vpc_security_group_ids = [
+    aws_security_group.ssh.id,
+    aws_security_group.database.id
+  ]
+
+  tags = {
+    Name = "travelMemory-database-sukhil"
+  }
+
+  depends_on = [aws_ami_from_instance.frontend_ami]
+}

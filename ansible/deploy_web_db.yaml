@@ -1,0 +1,52 @@
+---
+- name: Setup MongoDB on the database server and configure the web server
+  hosts: all
+  become: yes
+  tasks:
+    - name: Check if the 'travelmemory' database exists
+      mongo_shell: "db.getMongo().getDBNames().includes('travelmemory')"
+      register: db_check
+      ignore_errors: yes
+      when: "'db' in group_names"
+
+    - name: Create 'travelmemory' database and user if it does not exist
+      mongo_user:
+        login_user: 'adminUser'          # Replace with a user that has permissions
+        login_password: 'adminPassword'   # Replace with the password for the admin user
+        database: 'travelmemory'
+        name: 'travelmemoryuser'
+        password: 'password'
+        state: present
+        roles:
+          - readWrite
+      when: "'db' in group_names and db_check.stdout | length == 0"
+
+    - name: Change bindIp to 0.0.0.0 in MongoDB config
+      lineinfile:
+        path: /etc/mongod.conf
+        regexp: '^ *bindIp:'
+        line: '  bindIp: 0.0.0.0'
+        state: present
+      when: "'db' in group_names"
+
+    - name: Restart MongoDB service
+      service:
+        name: mongod
+        state: restarted
+      when: "'db' in group_names"
+
+    - name: Copy 'userdata.sh' to the web server
+      copy:
+        src: ./userdata.sh
+        dest: /home/ubuntu/
+      when: "'web' in group_names"
+
+    - name: Ensure userdata.sh is executable
+      file:
+        path: /home/ubuntu/userdata.sh
+        mode: '0755'
+      when: "'web' in group_names"
+
+    - name: Execute userdata.sh to bring up the web server
+      command: /home/ubuntu/userdata.sh
+      when: "'web' in group_names"

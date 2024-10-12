@@ -3,7 +3,7 @@ sudo mkdir -p /home/ubuntu/MERN
 cd /home/ubuntu/MERN/
 sudo git clone https://github.com/UnpredictablePrashant/TravelMemory.git
 cd TravelMemory/backend/
-sudo echo -e "MONGO_URI='mongodb+srv://<username>:<password>@cluster0.dm4xp4t.mongodb.net/travelmemory'\nPORT=3001" >> .env
+sudo echo -e "MONGO_URI='mongodb://travelmemoryuser:password@10.0.2.155:27017/travelmemory'\nPORT=3001" >> .env
 sudo apt-get update -y && sudo apt-get upgrade -y
 sudo curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
 sudo apt-get install -y nodejs

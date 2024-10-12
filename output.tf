@@ -3,16 +3,21 @@ output "private_key_pem" {
   sensitive = true
 }
 
-output "bucketarn" {
-  description = "Public IP for EC2"
-  value       = aws_s3_bucket.mys3bucket.arn
+# output "bucketarn" {
+#   description = "Public IP for EC2"
+#   value       = aws_s3_bucket.mys3bucket.arn
+# }
+
+output "database_publicip" {
+  value = aws_instance.travelmemorydatabase.private_ip
 }
 
-output "ec2_publicip" {
-  value = aws_instance.travelmemoryec2.public_ip
+output "application_privateip" {
+  value = aws_instance.travelmemoryfrontend.public_ip
 }
 
 
 output "ec2_instanceid" {
-  value = aws_instance.travelmemoryec2.id
+  value = aws_instance.travelmemoryfrontend.id
 }
+
