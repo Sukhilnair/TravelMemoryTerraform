@@ -4,22 +4,18 @@
   become: yes
   tasks:
     - name: Check if the 'travelmemory' database exists
-      mongo_shell: "db.getMongo().getDBNames().includes('travelmemory')"
+      command: >
+        mongosh --quiet --eval "db.getMongo().getDBNames().includes('travelmemory')"
       register: db_check
+      changed_when: false
       ignore_errors: yes
       when: "'db' in group_names"
 
     - name: Create 'travelmemory' database and user if it does not exist
-      mongo_user:
-        login_user: 'adminUser'          # Replace with a user that has permissions
-        login_password: 'adminPassword'   # Replace with the password for the admin user
-        database: 'travelmemory'
-        name: 'travelmemoryuser'
-        password: 'password'
-        state: present
-        roles:
-          - readWrite
-      when: "'db' in group_names and db_check.stdout | length == 0"
+      command: >
+        mongosh --eval "db = db.getSiblingDB('travelmemory');
+        db.createUser({user: 'travelmemoryuser', pwd: 'password', roles: [{ role: 'readWrite', db: 'travelmemory' }]});"
+      when: "'db' in group_names and db_check.stdout != 'true'"
 
     - name: Change bindIp to 0.0.0.0 in MongoDB config
       lineinfile:
